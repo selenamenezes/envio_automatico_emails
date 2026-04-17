@@ -8,8 +8,6 @@ import shutil
 import re
 import config as c
 
-MATRICULA = "b621314"
-
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
 ES_DISPLAY_REQUIRED = 0x00000002
@@ -19,7 +17,7 @@ agora = datetime.now().date()
 timestamp_transito = os.path.getmtime(c.PLANILHA_TRANSITO)
 ultima_att = datetime.fromtimestamp(timestamp_transito).date()
 
-transito = rf"C:\BD\BASES\TRANSITO ZERO.xlsx"
+transito = c.PLANILHA_TRANSITO
 data_hoje = datetime.today().strftime('%d/%m/%Y')
 SETORES = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM"]
 SETOR_EXPEDIDOR = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM", "AMARA"]
@@ -29,7 +27,6 @@ TIPO = ["UTD", "COMERCIAL", "TÉCNICA"]
 
 DF_OM = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="OM")
 
-#if ultima_att.day == agora.day:
 UTD = c.CONTATO_UTD
 TECNICA = c.CONTATO_TECNICA
 COMERCIAL = c.CONTATO_COMERCIAL
