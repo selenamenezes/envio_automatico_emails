@@ -17,7 +17,6 @@ agora = datetime.now().date()
 timestamp_transito = os.path.getmtime(c.PLANILHA_TRANSITO)
 ultima_att = datetime.fromtimestamp(timestamp_transito).date()
 
-transito = c.PLANILHA_TRANSITO
 data_hoje = datetime.today().strftime('%d/%m/%Y')
 SETORES = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM"]
 SETOR_EXPEDIDOR = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM", "AMARA"]
