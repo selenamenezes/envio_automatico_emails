@@ -1,31 +1,35 @@
 from datetime import datetime
 import os
 import pandas as pd
-import ctypes
 import time
 import win32com.client as win32
-import shutil
 import re
 import config as c
+import traceback
 
+# MANTER O COMPUTADOR ATIVO DURANTE A EXECUÇÃO DO SCRIPT
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
 ES_DISPLAY_REQUIRED = 0x00000002
 
+#IMAGEM PARA O CORPO DO E-MAIL
 CID_IMAGEM = "caminhao1"
+
+#CONFIGURAÇÕES DE DATA E HORA
 agora = datetime.now().date()
 timestamp_transito = os.path.getmtime(c.PLANILHA_TRANSITO)
 ultima_att = datetime.fromtimestamp(timestamp_transito).date()
-
 data_hoje = datetime.today().strftime('%d/%m/%Y')
+
 SETORES = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM"]
 SETOR_EXPEDIDOR = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CENTRO", "BLINDAGEM", "AMARA"]
 
 DF = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="RELAÇÃO_PEDIDOS")
-TIPO = ["UTD", "COMERCIAL", "TÉCNICA"]
+TIPO = ["UTD", "COMERCIAL", "TECNICA"]
 
-DF_OM = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="OM")
+#DF_OM = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="OM")
 
+# ARQUIVOS E CONTATOS
 UTD = c.CONTATO_UTD
 TECNICA = c.CONTATO_TECNICA
 COMERCIAL = c.CONTATO_COMERCIAL
@@ -40,38 +44,36 @@ ARQUIVOS_OM = c.ARQUIVOS_OM
 def atualizar_transito_zero_2025():
     consultas = ["Consulta - ZMM94", "Consulta - ZMM94 (2)", "Consulta - DATA BASE", "Consulta - RELAÇÃO_PEDIDOS"]
 
-    win32.gencache.is_readonly = False
-    win32.gencache.Rebuild()
-
-    excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False
-
+    excel = win32.DispatchEx("Excel.Application")
+    excel.DisplayAlerts = False
+    excel.EnableEvents = False
+    excel.AskToUpdateLinks = False
+    wb = None
     try:
         wb = excel.Workbooks.Open(c.PLANILHA_TRANSITO)
+        for consulta in consultas:
+            print(f"Atualizando Consulta: {consulta}")
+            try:
+                connection = next((c for c in wb.Connections if c.Name == consulta), None)
+                if connection and connection.Type == 1:
+                    oledb = connection.OLEDBConnection
+                    oledb.BackgroundQuery = False
+                    oledb.Refresh()
+                    print(f"\tConsulta '{consulta}' atualizada!")
+                else:
+                    print(f"Conexão '{consulta}' não encontrada ou inválida.")
+            except Exception as e:
+                print(f"Erro ao atualizar '{consulta}': {e}")
+                print(traceback.format_exc())
+        wb.Close(SaveChanges=1)
     except Exception as e:
-        print(f"Erro ao abrir a planilha: {e}")
+        print(f"Erro ao abrir/atualizar planilha {c.PLANILHA_TRANSITO}: {e}")
+        print(traceback.format_exc())
+    finally:
+        if wb:
+            wb = None
         excel.Quit()
-        return
-
-    for consulta in consultas:
-        print(f"Atualizando Consulta: {consulta}")
-        try:
-            connection = next((conn for conn in wb.Connections if conn.Name == consulta), None)
-            if connection is None:
-                print(f"Conexão '{consulta}' não encontrada.")
-                continue
-            if connection.Type == 1:
-                oledb = connection.OLEDBConnection
-                oledb.BackgroundQuery = False
-                oledb.Refresh()
-                time.sleep(3)
-                print(f"Consulta '{consulta}' atualizada!")
-            else:
-                print(f"Conexão '{consulta}' não encontrada. A atualização foi pulada!")
-        except Exception as e:
-            print(f"Erro ao atualizar '{consulta}': {e}")
-    wb.Close(SaveChanges=True)
-    excel.Quit()
+        excel = None
 
 def filtro_transito(df, tipos, setores):
 
@@ -92,13 +94,8 @@ def filtro_transito(df, tipos, setores):
             dfs_validos = []
 
             filtros = [
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "DE-PARA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "EXPEDIÇÃO") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "REVERSA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "SUCATA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "REFORMA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "SUCATA - ETM") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "EXPEDIÇÃO - MEDIDOR") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo)
+                (df["SETOR"] == setor) & ((df["Tipo de TR"] == "DE-PARA") | (df["Tipo de TR"] == "EXPEDIÇÃO - MEDIDOR") | (df["Tipo de TR"] == "EXPEDIÇÃO")) & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo) & ((df["Status"] == "10 DIAS") | (df["Status"] == "+ 10 DIAS")),
+                (df["SETOR_EXPEDIDOR"] == setor) & ((df["Tipo de TR"] == "REVERSA") | (df["Tipo de TR"] == "SUCATA") | (df["Tipo de TR"] == "REFORMA") | (df["Tipo de TR"] == "SUCATA - ETM")) & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo) & ((df["Status"] == "10 DIAS") | (df["Status"] == "+ 10 DIAS"))
             ]
 
             for f in filtros:
@@ -131,13 +128,8 @@ def filtro_transito_sem_recebedor(df, tipos, setores):
             dfs_validos = []
 
             filtros = [
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "DE-PARA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "EXPEDIÇÃO") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "REVERSA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "SUCATA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "REFORMA") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR_EXPEDIDOR"] == setor) & (df["Tipo de TR"] == "SUCATA - ETM") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo),
-                (df["SETOR"] == setor) & (df["Tipo de TR"] == "EXPEDIÇÃO - MEDIDOR") & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo)
+                (df["SETOR"] == setor) & ((df["Tipo de TR"] == "DE-PARA") | (df["Tipo de TR"] == "EXPEDIÇÃO - MEDIDOR") | (df["Tipo de TR"] == "EXPEDIÇÃO")) & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo) & ((df["Status"] == "10 DIAS") | (df["Status"] == "+ 10 DIAS")) & (df["SEM DEP"] == "SIM"),
+                (df["SETOR_EXPEDIDOR"] == setor) & ((df["Tipo de TR"] == "REVERSA") | (df["Tipo de TR"] == "SUCATA") | (df["Tipo de TR"] == "REFORMA") | (df["Tipo de TR"] == "SUCATA - ETM")) & (df["ATIVO"] == "SIM") & (df["TIPO"] == tipo) & ((df["Status"] == "10 DIAS") | (df["Status"] == "+ 10 DIAS")) & (df["SEM DEP"] == "NAO")
             ]
 
             for f in filtros:
@@ -203,7 +195,7 @@ def filtro_om_pendente_encerramento(df, setores):
             print(f"Nenhum dado para o setor: {setor}")
 
 
-def enviar_emails(tipo_nome, emails_dict, arquivos_dict, arquivos_sem_dep_dict, cc):
+def enviar_emails(tipo_nome, emails_dict, arquivos_dict, cc):
     outlook = win32.Dispatch("Outlook.Application")
 
     for setor, lista_emails in emails_dict.items():
@@ -212,10 +204,6 @@ def enviar_emails(tipo_nome, emails_dict, arquivos_dict, arquivos_sem_dep_dict, 
         caminho_principal = arquivos_dict.get(setor)
         if caminho_principal and os.path.exists(caminho_principal):
             anexos.append(caminho_principal)
-
-        caminho_sem_dep = arquivos_sem_dep_dict.get(setor)
-        if caminho_sem_dep and os.path.exists(caminho_sem_dep):
-            anexos.append(caminho_sem_dep)
 
         if anexos and lista_emails:
             mail = outlook.CreateItem(0)
@@ -237,44 +225,42 @@ def enviar_emails(tipo_nome, emails_dict, arquivos_dict, arquivos_sem_dep_dict, 
         else:
             print(f"Nenhum e-mail enviado para {tipo_nome} - {setor.upper()} (sem anexos ou destinatários).")
 
-def enviar_emails_om(emails_dict, arquivos_dict, cc):
-    outlook = win32.Dispatch("Outlook.Application")
+#def enviar_emails_om(emails_dict, arquivos_dict, cc):
+#    outlook = win32.Dispatch("Outlook.Application")
+#
+#    for setor,lista_emails in emails_dict.items():
+#        anexos = []
+#
+#        caminho_principal = arquivos_dict.get(setor)
+#        if caminho_principal and os.path.exists(caminho_principal):
+#            anexos.append(caminho_principal)
+#
+#        if anexos and lista_emails:
+#            mail = outlook.CreateItem(0)
+#            mail.To = lista_emails[0]
+#            mail.Subject = f"[OM]: PENDÊNCIAS DE ENCERRAMENTO - {setor.upper()} | {data_hoje}"
+#            mail.HTMLBody = c.CORPO_OM
+#            mail.CC = cc
 
-    for setor,lista_emails in emails_dict.items():
-        anexos = []
-
-        caminho_principal = arquivos_dict.get(setor)
-        if caminho_principal and os.path.exists(caminho_principal):
-            anexos.append(caminho_principal)
-
-        if anexos and lista_emails:
-            mail = outlook.CreateItem(0)
-            mail.To = lista_emails[0]
-            mail.Subject = f"[OM]: PENDÊNCIAS DE ENCERRAMENTO - {setor.upper()} | {data_hoje}"
-            mail.HTMLBody = c.CORPO_OM
-            mail.CC = cc
-
-            for anexo in anexos:
-                mail.Attachments.Add(anexo)
+#            for anexo in anexos:
+#                mail.Attachments.Add(anexo)
 
 
-            mail.Send()
-            time.sleep(300)
-            print(f"Alerta OM enviado para {setor.upper()} com {len(anexos)} anexo")
-        else:
-            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
+#            mail.Send()
+#            time.sleep(300)
+#            print(f"Alerta OM enviado para {setor.upper()} com {len(anexos)} anexo")
+#        else:
+#            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
 
-#atualizar_transito_zero_2025()
-#time.sleep(500)
-
+atualizar_transito_zero_2025()
+time.sleep(500)
 filtro_transito(DF, TIPO, SETORES)
-filtro_transito_sem_recebedor(DF, TIPO, SETOR_EXPEDIDOR)
 time.sleep(50)
-enviar_emails("UTD", UTD, ARQUIVOS_UTD, ARQUIVOS_UTD_SEM_DEP, c.CC)
+enviar_emails("UTD", UTD, ARQUIVOS_UTD, c.CC)
 time.sleep(600)
-enviar_emails("TÉCNICA", TECNICA, ARQUIVOS_TECNICA, ARQUIVOS_TECNICA_SEM_DEP, c.CC)
+enviar_emails("TECNICA", TECNICA, ARQUIVOS_TECNICA, c.CC)
 time.sleep(600)
-enviar_emails("COMERCIAL", COMERCIAL, ARQUIVOS_COMERCIAL, ARQUIVOS_COMERCIAL_SEM_DEP, c.CC)
+enviar_emails("COMERCIAL", COMERCIAL, ARQUIVOS_COMERCIAL, c.CC)
 
 #filtro_om_pendente_encerramento(DF_OM, SETORES)
 #enviar_emails_om(UTD, ARQUIVOS_OM, c.CC)

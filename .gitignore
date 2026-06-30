@@ -1,0 +1,9 @@
+*.xlsx
+*.html
+main_antigo.py
+teste_main.py
+__pycache__/
+venv/
+*.pyc
+atualiza_mrp_teste.py
+config.py
