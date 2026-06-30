@@ -252,10 +252,12 @@ def enviar_emails(tipo_nome, emails_dict, arquivos_dict, cc):
 #        else:
 #            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
 
-atualizar_transito_zero_2025()
-time.sleep(500)
-filtro_transito(DF, TIPO, SETORES)
-time.sleep(50)
+#atualizar_transito_zero_2025()
+#time.sleep(500)
+#os.system("taskkill /f /im excel.exe")
+#time.sleep(30)
+#filtro_transito(DF, TIPO, SETORES)
+#time.sleep(50)
 enviar_emails("UTD", UTD, ARQUIVOS_UTD, c.CC)
 time.sleep(600)
 enviar_emails("TECNICA", TECNICA, ARQUIVOS_TECNICA, c.CC)
