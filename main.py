@@ -6,6 +6,8 @@ import win32com.client as win32
 import re
 import config as c
 import traceback
+from typing import Optional, Iterable
+
 
 # MANTER O COMPUTADOR ATIVO DURANTE A EXECUÇÃO DO SCRIPT
 ES_CONTINUOUS = 0x80000000
@@ -41,7 +43,28 @@ ARQUIVOS_COMERCIAL_SEM_DEP = c.ARQUIVOS_COMERCIAL_SEM_DEP
 ARQUIVOS_TECNICA_SEM_DEP = c.ARQUIVOS_TECNICA_SEM_DEP
 ARQUIVOS_OM = c.ARQUIVOS_OM
 
+def limpar_xlsx_na_pasta(pasta: str) -> None:
+    if not pasta:
+        return
+
+    os.makedirs(pasta, exist_ok=True)
+
+    try:
+        for nome in os.listdir(pasta):
+            if nome.lower().endswith(".xlsx"):
+                caminho = os.path.join(pasta, nome)
+                try:
+                    os.remove(caminho)
+                except PermissionError:
+                    print(f"[AVISO] nao foi possível remover: {caminho}")
+                except Exception as e:
+                    print(f"[AVISO] falha ao remover {caminho}: {e}")
+    except FileNotFoundError:
+        return
+
+
 def atualizar_transito_zero_2025():
+
     consultas = ["Consulta - ZMM94", "Consulta - ZMM94 (2)", "Consulta - DATA BASE", "Consulta - RELAÇÃO_PEDIDOS"]
 
     excel = win32.DispatchEx("Excel.Application")
@@ -252,12 +275,13 @@ def enviar_emails(tipo_nome, emails_dict, arquivos_dict, cc):
 #        else:
 #            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
 
-#atualizar_transito_zero_2025()
-#time.sleep(500)
-#os.system("taskkill /f /im excel.exe")
-#time.sleep(30)
+
+#limpar_xlsx_na_pasta(c.PASTA_TRANSITO_REDE)
+#limpar_xlsx_na_pasta(c.PASTA_TRANSITO_BD)
+
 #filtro_transito(DF, TIPO, SETORES)
 #time.sleep(50)
+
 enviar_emails("UTD", UTD, ARQUIVOS_UTD, c.CC)
 time.sleep(600)
 enviar_emails("TECNICA", TECNICA, ARQUIVOS_TECNICA, c.CC)
