@@ -29,7 +29,7 @@ SETOR_EXPEDIDOR = ["CENTRO-OESTE", "METROPOLITANO", "NORTE", "OESTE", "SUL", "CE
 DF = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="RELAÇÃO_PEDIDOS")
 TIPO = ["UTD", "COMERCIAL", "TECNICA"]
 
-#DF_OM = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="OM")
+DF_OM = pd.read_excel(c.PLANILHA_TRANSITO, sheet_name="OM")
 
 # ARQUIVOS E CONTATOS
 UTD = c.CONTATO_UTD
@@ -106,11 +106,11 @@ def filtro_transito(df, tipos, setores):
     df["Tipo de TR"] = df["Tipo de TR"].astype(str).str.strip().str.upper()
     df["ATIVO"] = df["ATIVO"].astype(str).str.strip().str.upper()
 
-    pasta_1 = c.PASTA_TRANSITO_REDE
-    pasta_2 = c.PASTA_TRANSITO_BD
+    pasta_rede = c.PASTA_TRANSITO_REDE
+    pasta_bd = c.PASTA_TRANSITO_BD
 
-    os.makedirs(pasta_1, exist_ok=True)
-    os.makedirs(pasta_2, exist_ok=True)
+    os.makedirs(pasta_rede, exist_ok=True)
+    os.makedirs(pasta_bd, exist_ok=True)
 
     for tipo in tipos:
         for setor in setores:
@@ -129,22 +129,22 @@ def filtro_transito(df, tipos, setores):
             if dfs_validos:
                 df_final = pd.concat(dfs_validos)
                 nome_arquivo = f"{tipo}_{setor}.xlsx"
-                caminho_1 = os.path.join(pasta_1, nome_arquivo)
-                caminho_2 = os.path.join(pasta_2, nome_arquivo)
+                caminho_rede = os.path.join(pasta_rede, nome_arquivo)
+                caminho_bd = os.path.join(pasta_bd, nome_arquivo)
 
-                df_final.to_excel(caminho_1, index=False)
-                df_final.to_excel(caminho_2, index=False)
+                df_final.to_excel(caminho_rede, index=False)
+                df_final.to_excel(caminho_bd, index=False)
 
-                print(f"Arquivos salvos em:\n- {caminho_1}\n- {caminho_2}")
+                print(f"Arquivos salvos em:\n- {caminho_rede}\n- {caminho_bd}")
             else:
                 print(f"Nenhum dado para {tipo} - {setor}")
                 
 
 def filtro_transito_sem_recebedor(df, tipos, setores):
-    pasta_1 = c.PASTA_SEM_DEP_REDE
-    pasta_2 = c.PASTA_SEM_DEP
-    os.makedirs(pasta_1, exist_ok=True)
-    os.makedirs(pasta_2, exist_ok=True)
+    pasta_rede = c.PASTA_SEM_DEP_REDE
+    pasta_bd = c.PASTA_SEM_DEP
+    os.makedirs(pasta_rede, exist_ok=True)
+    os.makedirs(pasta_bd, exist_ok=True)
 
     for tipo in tipos:
         for setor in setores:
@@ -163,11 +163,11 @@ def filtro_transito_sem_recebedor(df, tipos, setores):
             if dfs_validos:
                 df_final = pd.concat(dfs_validos)
                 nome_arquivo = f"{tipo}_{setor}_SEM_RECEBEDOR.xlsx"
-                caminho_1 = os.path.join(pasta_1, nome_arquivo)
-                caminho_2 = os.path.join(pasta_2, nome_arquivo)
+                caminho_rede = os.path.join(pasta_rede, nome_arquivo)
+                caminho_bd = os.path.join(pasta_bd, nome_arquivo)
 
-                df_final.to_excel(caminho_1, index=False)
-                df_final.to_excel(caminho_2, index=False)
+                df_final.to_excel(caminho_rede, index=False)
+                df_final.to_excel(caminho_bd, index=False)
 
                 print(f"Arquivos salvos")
             else:
@@ -179,13 +179,12 @@ def filtro_om_pendente_encerramento(df, setores):
     pasta_om = c.PASTA_OM
     os.makedirs(pasta_om, exist_ok=True)
 
-    colunas_necessarias = {'STATUS BI', 'ZMM94', 'SETOR', 'Tipo de Nota Fiscal'}
+    colunas_necessarias = {'ZMM94', 'SETOR', 'Tipo de Nota Fiscal'}
     faltantes = colunas_necessarias - set(df.columns)
     if faltantes:
         raise KeyError(f"Colunas ausentes no DataFrame: {sorted(faltantes)}")
 
     
-    df['STATUS BI'] = df['STATUS BI'].astype(str).str.strip()
     df['ZMM94'] = df['ZMM94'].astype(str).str.strip()
     df['SETOR'] = df['SETOR'].astype(str).str.strip()
     df['Tipo de Nota Fiscal'] = df['Tipo de Nota Fiscal'].astype(str).str.strip()
@@ -196,7 +195,6 @@ def filtro_om_pendente_encerramento(df, setores):
 
     for setor in setores:
         filtro = (
-            (df['STATUS BI'] == "Em andamento") &
             (df['ZMM94'] == 'TRANSITO ENCERRADO') &
             (df['SETOR'] == setor) &
             (df['Tipo de Nota Fiscal'] == "Neoenergia")
@@ -248,47 +246,47 @@ def enviar_emails(tipo_nome, emails_dict, arquivos_dict, cc):
         else:
             print(f"Nenhum e-mail enviado para {tipo_nome} - {setor.upper()} (sem anexos ou destinatários).")
 
-#def enviar_emails_om(emails_dict, arquivos_dict, cc):
-#    outlook = win32.Dispatch("Outlook.Application")
-#
-#    for setor,lista_emails in emails_dict.items():
-#        anexos = []
-#
-#        caminho_principal = arquivos_dict.get(setor)
-#        if caminho_principal and os.path.exists(caminho_principal):
-#            anexos.append(caminho_principal)
-#
-#        if anexos and lista_emails:
-#            mail = outlook.CreateItem(0)
-#            mail.To = lista_emails[0]
-#            mail.Subject = f"[OM]: PENDÊNCIAS DE ENCERRAMENTO - {setor.upper()} | {data_hoje}"
-#            mail.HTMLBody = c.CORPO_OM
-#            mail.CC = cc
+def enviar_emails_om(emails_dict, arquivos_dict, cc):
+    outlook = win32.Dispatch("Outlook.Application")
 
-#            for anexo in anexos:
-#                mail.Attachments.Add(anexo)
+    for setor,lista_emails in emails_dict.items():
+        anexos = []
 
+        caminho_principal = arquivos_dict.get(setor)
+        if caminho_principal and os.path.exists(caminho_principal):
+            anexos.append(caminho_principal)
 
-#            mail.Send()
-#            time.sleep(300)
-#            print(f"Alerta OM enviado para {setor.upper()} com {len(anexos)} anexo")
-#        else:
-#            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
+        if anexos and lista_emails:
+            mail = outlook.CreateItem(0)
+            mail.To = lista_emails[0]
+            mail.Subject = f"[OM]: PENDÊNCIAS DE ENCERRAMENTO - {setor.upper()} | {data_hoje}"
+            mail.HTMLBody = c.CORPO_OM
+            mail.CC = cc
+
+            for anexo in anexos:
+                mail.Attachments.Add(anexo)
+
+            mail.Send()
+            time.sleep(300)
+            print(f"Alerta OM enviado para {setor.upper()} com {len(anexos)} anexo")
+        else:
+            print(f"Alerta OM enviado para {setor} (sem anexos ou destinatários)")
 
 
 #limpar_xlsx_na_pasta(c.PASTA_TRANSITO_REDE)
-#limpar_xlsx_na_pasta(c.PASTA_TRANSITO_BD)
+
+#time.sleep(15)
 
 #filtro_transito(DF, TIPO, SETORES)
 #time.sleep(50)
 
-enviar_emails("UTD", UTD, ARQUIVOS_UTD, c.CC)
-time.sleep(600)
-enviar_emails("TECNICA", TECNICA, ARQUIVOS_TECNICA, c.CC)
-time.sleep(600)
-enviar_emails("COMERCIAL", COMERCIAL, ARQUIVOS_COMERCIAL, c.CC)
+#enviar_emails("UTD", UTD, ARQUIVOS_UTD, c.CC)
+#time.sleep(600)
+#enviar_emails("TECNICA", TECNICA, ARQUIVOS_TECNICA, c.CC)
+#time.sleep(600)
+#enviar_emails("COMERCIAL", COMERCIAL, ARQUIVOS_COMERCIAL, c.CC)
 
-#filtro_om_pendente_encerramento(DF_OM, SETORES)
+filtro_om_pendente_encerramento(DF_OM, SETORES)
 #enviar_emails_om(UTD, ARQUIVOS_OM, c.CC)
 #enviar_emails_om(TECNICA, ARQUIVOS_OM, c.CC)
 #enviar_emails_om(COMERCIAL, ARQUIVOS_OM, c.CC)

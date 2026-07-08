@@ -1,9 +1,7 @@
 *.xlsx
 *.html
-main_antigo.py
-teste_main.py
 __pycache__/
 venv/
+ENCERRAR_OM/
 *.pyc
-atualiza_mrp_teste.py
 config.py
